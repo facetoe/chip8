@@ -2,6 +2,8 @@ import logging
 import os
 import sys
 
+from util import to_bits
+
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
 
@@ -100,7 +102,6 @@ class Interpreter(object):
             raise Exception("No such path: %s" % program_path)
         elif not os.path.isfile(program_path):
             raise Exception("Not a valid file: %s" % program_path)
-
         with open(program_path, 'rb') as f:
             self._load(f.read())
 
@@ -347,8 +348,8 @@ class Interpreter(object):
         The value of register I is set to nnn.
         """
         nnn = opcode & 0x0FFF
-        log.debug("%s - load_i(nnn=%s)" % (hex(opcode), nnn))
         self.I = nnn
+        log.debug("%s - load_i(nnn=%s)" % (hex(opcode), nnn))
 
     def jmp_v0_nnn(self, opcode):
         """
@@ -380,7 +381,19 @@ class Interpreter(object):
         VF is set to 1, otherwise it is set to 0. If the sprite is positioned so part of it
         is outside the coordinates of the display, it wraps around to the opposite side of the screen.
         """
-        log.debug("%s - draw_vx_vy()" % hex(opcode))
+        x = self.V[(opcode & 0x0F00) >> 8]
+        y = self.V[(opcode & 0x00F0) >> 4]
+        height = opcode & 0x000F
+
+        log.debug("%s - draw_vx_vy(x=%s, y=%s, height=%s)" % (hex(opcode), x, y, height))
+        for row, byte in enumerate(self.memory[self.I: self.I + height]):
+            for col, bit in enumerate(to_bits(byte)):
+                if bit:
+                    graph_bit_index = ((col + x) + (row + y) * 64)
+                    if self.gfx_buffer[graph_bit_index] == 1:
+                        self.V[0xF] = 1
+                    self.gfx_buffer[graph_bit_index] ^= 1
+        sys.exit()
 
     def skip_vx(self, opcode):
         """
@@ -489,4 +502,4 @@ code = [0xf21e, 0xf21e]
 
 i = Interpreter()
 # i.run(program_raw=code)
-i.run(program_path='/home/facetoe/Downloads/chio/PONG')
+i.run(program_path='/home/facetoe/Downloads/chio/INVADERS')
