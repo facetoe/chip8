@@ -1,7 +1,6 @@
 import logging
 import os
 import sys
-from time import sleep
 
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
@@ -31,12 +30,22 @@ class Interpreter(object):
     # Mapping of opcodes to functions that handle them
     function_map = None
 
-    def initialize(self, program_path):
+    def initialize(self, program_path=None, program_raw=None):
+        if not program_path and not program_raw:
+            raise Exception("Path or binary are required")
+
         # 4K memory
         # 0x000-0x1FF - Chip 8 interpreter (contains font set in emu)
         # 0x050-0x0A0 - Used for the built in 4x5 pixel font set (0-F)
         # 0x200-0xFFF - Program ROM and work RAM
         self.memory = 4096 * [0]
+
+        if program_path:
+            self._load_program(program_path)
+        else:
+            self._load(program_raw, raw=True)
+
+        self._init_func_map()
 
         # Program counter is initialized to offset of 512 bytes
         self.pc = self.PROGRAM_START
@@ -59,11 +68,8 @@ class Interpreter(object):
         # Stack
         self.stack = list()
 
-        self._load_program(program_path)
-        self._init_func_map()
-
-    def run(self, program_path):
-        self.initialize(program_path)
+    def run(self, **kwargs):
+        self.initialize(**kwargs)
         while self.pc < len(self.memory):
             self.opcode = self._fetch()
             self.pc += 2
@@ -72,7 +78,7 @@ class Interpreter(object):
                 res = self.opcode & 0xF000
                 # First 4 bits are off, could be cls or ret
                 if res == 0x0000:
-                    self.function_map[self.opcode]()
+                    self.function_map[self.opcode & 0x00FF]()
                 # The 8 space is shared, extract the first and last bits to determine what we have
                 elif res == 0x8000:
                     self.function_map[res & 0xF00F]()
@@ -81,10 +87,9 @@ class Interpreter(object):
                     self.function_map[res & 0xF0FF]()
                 else:
                     self.function_map[self.opcode & 0xF000]()
-            except Exception:
+            except KeyError, e:
                 if self.opcode:
-                    pass
-                    log.error("Unknown opcode: %s" % hex(self.opcode))
+                    log.error("Unknown opcode: %s - %s" % (hex(self.opcode), e.message))
 
     def _load_program(self, program_path):
         if not os.path.exists(program_path):
@@ -93,13 +98,23 @@ class Interpreter(object):
             raise Exception("Not a valid file: %s" % program_path)
 
         with open(program_path, 'rb') as f:
-            for idx, byte in enumerate(f.read()):
-                # load program into memory at offset of 512 bytes
+            self._load(f.read())
+
+    def _load(self, bytes, raw=False):
+        for idx, byte in enumerate(bytes):
+            # load program into memory at offset of 512 bytes
+            if raw:
+                self.memory[self.PROGRAM_START + idx] = byte
+            else:
                 self.memory[self.PROGRAM_START + idx] = ord(byte)
 
+    def _fetch(self):
+        # chip8 opcodes are two bytes. Merge two bytes from pc to obtain the complete opcode
+        return self.memory[self.pc] << 8 | self.memory[self.pc + 1]
+
     def _init_func_map(self):
-        self.function_map = {0x00E0: self.cls,
-                             0x00EE: self.ret,
+        self.function_map = {0xE0: self.cls,
+                             0xEE: self.ret,
                              0x1000: self.jmp_nnn,
                              0x2000: self.call_nnn,
                              0x3000: self.se_vx_kk,
@@ -161,8 +176,9 @@ class Interpreter(object):
 
         The interpreter sets the program counter to nnn.
         """
-        log.debug("%s - jmp()" % hex(self.opcode))
-        self.pc = self.opcode & 0x0FFF
+        jump_addr = self.opcode & 0x0FFF
+        log.debug("%s - jmp_nnn %s -> %s" % (hex(self.opcode), self.pc-1, jump_addr))
+        self.pc = jump_addr
 
     def call_nnn(self):
         """
@@ -172,6 +188,7 @@ class Interpreter(object):
         The interpreter increments the stack pointer, then puts the current PC
         on the top of the stack. The PC is then set to nnn.
         """
+        log.debug("%s - call_nnn()" % hex(self.opcode))
         log.debug("%s - call()" % hex(self.opcode))
         self.stack.append(self.pc)
         self.pc = self.opcode & 0x0FFF
@@ -211,7 +228,10 @@ class Interpreter(object):
 
         The interpreter puts the value kk into register Vx.
         """
-        log.debug("%s - put_vx_kk()" % hex(self.opcode))
+        x = (self.opcode & 0x0F00) >> 8
+        kk = self.opcode & 0x00FF
+        self.V[x] = kk
+        log.debug("%s: put_vx_kk(x=%s, kk=%s)" % (hex(self.opcode), x, kk))
 
     def add_vx_kk(self):
         """
@@ -320,7 +340,9 @@ class Interpreter(object):
 
         The value of register I is set to nnn.
         """
-        log.debug("%s - load_i()" % hex(self.opcode))
+        nnn = self.opcode & 0x0FFF
+        log.debug("%s - load_i(nnn=%s)" % (hex(self.opcode), nnn))
+        self.I = nnn
 
     def jmp_v0_nnn(self):
         """
@@ -456,11 +478,9 @@ class Interpreter(object):
         """
         log.debug("%s - load_vx_i()" % hex(self.opcode))
 
-    def _fetch(self):
-        # chip8 opcodes are two bytes. Merge two bytes from pc to obtain the complete opcode
-        return self.memory[self.pc] << 8 | self.memory[self.pc + 1]
 
+code = [0xf21e, 0xf21e]
 
 i = Interpreter()
-
-i.run('/home/facetoe/Downloads/chio/INVADERS')
+# i.run(program_raw=code)
+i.run(program_path='/home/facetoe/Downloads/chio/PONG')
