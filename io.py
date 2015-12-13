@@ -4,6 +4,9 @@ import curses
 class IO(object):
     win = None
 
+    def __init__(self, screen):
+        self.initialize(screen)
+
     def initialize(self, screen):
         curses.start_color()
         curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
@@ -15,18 +18,12 @@ class IO(object):
         self.win = curses.newwin(32, 64, 5, 5)
         self.win.bkgd(curses.color_pair(2))
 
-    def draw(self, startx, starty, graphics):
+    def draw(self, graphics):
+        self.win.clear()
         for i, bit in enumerate(graphics):
-            x, y = startx + (i % 32), starty + (i / 32)
-            char = '*' if bit else " "
+            x, y = (i % 32), (i / 32)
+            char = '*' if bit else ""
             if x < 61 and y < 31:
                 self.win.addstr(y, x, char)
         self.win.box()
         self.win.refresh()
-        self.win.getch()
-
-# try:
-#     curses.wrapper(main)
-# except KeyboardInterrupt:
-#     print("Got KeyboardInterrupt exception. Exiting...")
-#     exit()

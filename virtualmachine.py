@@ -8,14 +8,15 @@ from util import to_bits
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
 
-ch = logging.StreamHandler(sys.stdout)
-ch.setLevel(logging.DEBUG)
+# ch = logging.StreamHandler(sys.stdout)
+fh = logging.FileHandler('/dev/pts/1')
+fh.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(message)s')
-ch.setFormatter(formatter)
-log.addHandler(ch)
+fh.setFormatter(formatter)
+log.addHandler(fh)
 
 
-class Interpreter(object):
+class VirtualMachine(object):
     memory = None
     V = None
     I = None
@@ -175,6 +176,7 @@ class Interpreter(object):
         Opcode: 00E0
         """
         log.debug("%s - cls()" % hex(opcode))
+        exit()
 
     def ret(self, opcode):
         """
@@ -233,6 +235,7 @@ class Interpreter(object):
         The interpreter compares register Vx to kk, and if they are not equal, increments the program counter by 2.
         """
         log.debug("%s - sne_vx_kk()" % hex(opcode))
+        exit()
 
     def se_vx_vy(self, opcode):
         """
@@ -243,6 +246,7 @@ class Interpreter(object):
         increments the program counter by 2.
         """
         log.debug("%s - se_vx_vy()" % hex(opcode))
+        exit()
 
     def put_vx_kk(self, opcode):
         """
@@ -276,6 +280,7 @@ class Interpreter(object):
         Stores the value of register Vy in register Vx.
         """
         log.debug("%s - load_vy_vx()" % hex(opcode))
+        exit()
 
     def or_vx_vy(self, opcode):
         """
@@ -285,6 +290,7 @@ class Interpreter(object):
         Performs a bitwise OR on the values of Vx and Vy, then stores the result in Vx.
         """
         log.debug("%s - or_vx_vy()" % hex(opcode))
+        exit()
 
     def and_vx_vy(self, opcode):
         """
@@ -294,6 +300,7 @@ class Interpreter(object):
         Performs a bitwise AND on the values of Vx and Vy, then stores the result in Vx
         """
         log.debug("%s - and_vx_vy()" % hex(opcode))
+        exit()
 
     def xor_vx_vy(self, opcode):
         """
@@ -303,6 +310,7 @@ class Interpreter(object):
         Performs a bitwise exclusive OR on the values of Vx and Vy, then stores the result in Vx.
         """
         log.debug("%s - xor_vx_vy()" % hex(opcode))
+        exit()
 
     def add_vx_vy(self, opcode):
         """
@@ -313,6 +321,7 @@ class Interpreter(object):
         VF is set to 1, otherwise 0. Only the lowest 8 bits of the result are kept, and stored in Vx.
         """
         log.debug("%s - add_vx_vy()" % hex(opcode))
+        exit()
 
     def sub_vx_vy(self, opcode):
         """
@@ -322,6 +331,7 @@ class Interpreter(object):
         If Vx > Vy, then VF is set to 1, otherwise 0. Then Vy is subtracted from Vx, and the results stored in Vx.
         """
         log.debug("%s - sub_vx_vy()" % hex(opcode))
+        exit()
 
     def shr_vx_vy(self, opcode):
         """
@@ -331,6 +341,7 @@ class Interpreter(object):
         If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0. Then Vx is divided by 2.
         """
         log.debug("%s - shr_vx_vy()" % hex(opcode))
+        exit()
 
     def subn_vx_vy(self, opcode):
         """
@@ -340,6 +351,7 @@ class Interpreter(object):
         If Vy > Vx, then VF is set to 1, otherwise 0. Then Vx is subtracted from Vy, and the results stored in Vx.
         """
         log.debug("%s - subn_vx_vy()" % hex(opcode))
+        exit()
 
     def shl_vx_vy(self, opcode):
         """
@@ -349,6 +361,7 @@ class Interpreter(object):
         If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0. Then Vx is multiplied by 2.
         """
         log.debug("%s - shl_vx_vy()" % hex(opcode))
+        exit()
 
     def sne_vx_vy(self, opcode):
         """
@@ -358,6 +371,7 @@ class Interpreter(object):
         The values of Vx and Vy are compared, and if they are not equal, the program counter is increased by 2.
         """
         log.debug("%s - sne_vx_vy()" % hex(opcode))
+        exit()
 
     def load_i(self, opcode):
         """
@@ -378,6 +392,7 @@ class Interpreter(object):
         The program counter is set to nnn plus the value of V0.
         """
         log.debug("%s - jmp_v0_nnn()" % hex(opcode))
+        exit()
 
     def rand_kk_vx(self, opcode):
         """
@@ -388,6 +403,7 @@ class Interpreter(object):
         The results are stored in Vx.
         """
         log.debug("%s - rand_kk_vx()" % hex(opcode))
+        exit()
 
     def draw_vx_vy(self, opcode):
         """
@@ -408,11 +424,13 @@ class Interpreter(object):
         for row, byte in enumerate(self.memory[self.I: self.I + height]):
             for col, bit in enumerate(to_bits(byte)):
                 if bit:
-                    index = ((col + x) + (row + y) * 64)
+                    index = (row + y) * 64 + (col + x)
                     if self.gfx_buffer[index] == 1:
                         self.V[0xF] = 1
                     self.gfx_buffer[index] ^= 1
         self.needs_refresh = True
+        sleep(1)
+        log.debug('\n')
 
     def skip_vx(self, opcode):
         """
@@ -423,6 +441,7 @@ class Interpreter(object):
         PC is increased by 2.
         """
         log.debug("%s - skip_vx()" % hex(opcode))
+        exit()
 
     def nskip_vx(self, opcode):
         """
@@ -433,6 +452,7 @@ class Interpreter(object):
         PC is increased by 2.
         """
         log.debug("%s - nskip_vx()" % hex(opcode))
+        exit()
 
     def load_vx_dt(self, opcode):
         """
@@ -442,6 +462,7 @@ class Interpreter(object):
         The value of DT is placed into Vx.
         """
         log.debug("%s - load_vx_dt()" % hex(opcode))
+        exit()
 
     def load_vx_k(self, opcode):
         """
@@ -451,6 +472,7 @@ class Interpreter(object):
         All execution stops until a key is pressed, then the value of that key is stored in Vx.
         """
         log.debug("%s - load_vx_k()" % hex(opcode))
+        exit()
 
     def load_dt_vx(self, opcode):
         """
@@ -460,6 +482,7 @@ class Interpreter(object):
         DT is set equal to the value of Vx.
         """
         log.debug("%s - load_dt_vx()" % hex(opcode))
+        exit()
 
     def load_st_vx(self, opcode):
         """
@@ -469,6 +492,7 @@ class Interpreter(object):
         ST is set equal to the value of Vx.
         """
         log.debug("%s - load_st_vx()" % hex(opcode))
+        exit()
 
     def add_i_vx(self, opcode):
         """
@@ -489,6 +513,7 @@ class Interpreter(object):
         The value of I is set to the location for the hexadecimal sprite corresponding to the value of Vx. See section 2.4
         """
         log.debug("%s - load_f_vx()" % hex(opcode))
+        exit()
 
     def load_b_vx(self, opcode):
         """
@@ -499,6 +524,7 @@ class Interpreter(object):
         the tens digit at location I+1, and the ones digit at location I+2.
         """
         log.debug("%s - load_b_vx()" % hex(opcode))
+        exit()
 
     def load_i_vx(self, opcode):
         """
@@ -508,24 +534,25 @@ class Interpreter(object):
         The interpreter copies the values of registers V0 through Vx into memory, starting at the address in I.
         """
         log.debug("%s - load_i_vx()" % hex(opcode))
+        exit()
 
     def load_vx_i(self, opcode):
         """
-
         Fx65 - LD Vx, [I]
         Read registers V0 through Vx from memory starting at location I.
 
         The interpreter reads values from memory starting at location I into registers V0 through Vx.
         """
         log.debug("%s - load_vx_i()" % hex(opcode))
+        exit()
 
 
-code = [0xf21e, 0xf21e]
-
-i = Interpreter()
-# i.run(program_raw=code)
-
-i.initialize(program_path='/home/facetoe/Downloads/chio/INVADERS')
-for _ in range(50):
-    i.tick()
-    sleep(0.2)
+# code = [0xf21e, 0xf21e]
+#
+# i = VirtualMachine()
+# # i.run(program_raw=code)
+#
+# i.initialize(program_path='/home/facetoe/Downloads/chio/INVADERS')
+# for _ in range(50):
+#     i.tick()
+#     sleep(0.2)
