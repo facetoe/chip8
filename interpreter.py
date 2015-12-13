@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from time import sleep
 
 from util import to_bits
 
@@ -20,6 +21,7 @@ class Interpreter(object):
     I = None
     pc = None
     gfx_buffer = None
+    needs_refresh = False
 
     delay_timer = None
     sound_timer = None
@@ -70,11 +72,16 @@ class Interpreter(object):
         # Stack for tracking jumps
         self.stack = list()
 
-    def run(self, **kwargs):
-        self.initialize(**kwargs)
-        while self.pc < len(self.memory):
-            opcode = self._fetch_next()
-            self._decode_exec(opcode)
+    def tick(self):
+        opcode = self._fetch_next()
+        self._decode_exec(opcode)
+
+    def _fetch_next(self):
+        # Chip8 opcodes are two bytes. Merge two bytes from pc to obtain the complete opcode
+        opcode = self.memory[self.pc] << 8 | self.memory[self.pc + 1]
+        # Increment the program counter
+        self.pc += 2
+        return opcode
 
     def _decode_exec(self, opcode):
         try:
@@ -86,8 +93,10 @@ class Interpreter(object):
             elif res == 0x8000:
                 func = self.function_map[res & 0xF00F]
             # The E and F space is also shared. The second half of the first byte tells us what we have
-            elif res == 0xe000 or res == 0xf000:
-                func = self.function_map[res & 0xF0FF]
+            elif res == 0xE000 :
+                func = self.function_map[opcode & 0xF0FF]
+            elif res == 0xF000:
+                func = self.function_map[opcode & 0xF0FF]
             else:
                 func = self.function_map[opcode & 0xF000]
 
@@ -106,19 +115,12 @@ class Interpreter(object):
             self._load(f.read())
 
     def _load(self, bytes, raw=False):
+        """load program into memory at offset of 512 bytes"""
         for idx, byte in enumerate(bytes):
-            # load program into memory at offset of 512 bytes
             if raw:
                 self.memory[self.PROGRAM_START + idx] = byte
             else:
                 self.memory[self.PROGRAM_START + idx] = ord(byte)
-
-    def _fetch_next(self):
-        # Chip8 opcodes are two bytes. Merge two bytes from pc to obtain the complete opcode
-        opcode = self.memory[self.pc] << 8 | self.memory[self.pc + 1]
-        # Increment the program counter
-        self.pc += 2
-        return opcode
 
     def _init_func_map(self):
         self.function_map = {0xE0: self.cls,
@@ -157,6 +159,15 @@ class Interpreter(object):
                              0xF065: self.load_vx_i
                              }
 
+    def _get_x(self, opcode):
+        return (opcode & 0x0F00) >> 8
+
+    def _get_y(self, opcode):
+        return (opcode & 0x00F0) >> 4
+
+    def _get_kk(self, opcode):
+        return opcode & 0x00FF
+
     def cls(self, opcode):
         """
         Clear the display.
@@ -174,7 +185,7 @@ class Interpreter(object):
 
         Opcode: 00EE
         """
-        log.debug("%s - ret()" % hex(opcode))
+        log.debug("%s: ret()" % hex(opcode))
         self.pc = self.stack.pop()
 
     def jmp_nnn(self, opcode):
@@ -185,7 +196,7 @@ class Interpreter(object):
         The interpreter sets the program counter to nnn.
         """
         jump_addr = opcode & 0x0FFF
-        log.debug("%s - jmp_nnn %s -> %s" % (hex(opcode), self.pc - 2, jump_addr))
+        log.debug("%s: jmp_nnn %s -> %s" % (hex(opcode), self.pc - 2, jump_addr))
         self.pc = jump_addr
 
     def call_nnn(self, opcode):
@@ -196,7 +207,7 @@ class Interpreter(object):
         The interpreter increments the stack pointer, then puts the current PC
         on the top of the stack. The PC is then set to nnn.
         """
-        log.debug("%s - call_nnn()" % hex(opcode))
+        log.debug("%s: call_nnn()" % hex(opcode))
         self.stack.append(self.pc)
         self.pc = opcode & 0x0FFF
 
@@ -207,7 +218,12 @@ class Interpreter(object):
 
         The interpreter compares register Vx to kk, and if they are equal, increments the program counter by 2.
         """
-        log.debug("%s - se_vx_kk()" % hex(opcode))
+        x = self._get_x(opcode)
+        kk = self._get_kk(opcode)
+        Vx = self.V[x]
+        if Vx == kk:
+            self.pc += 2
+        log.debug("%s: se_vx_kk(V[x]=%s, kk=%s)" % (hex(opcode), Vx, kk))
 
     def sne_vx_kk(self, opcode):
         """
@@ -235,8 +251,8 @@ class Interpreter(object):
 
         The interpreter puts the value kk into register Vx.
         """
-        x = (opcode & 0x0F00) >> 8
-        kk = opcode & 0x00FF
+        x = self._get_x(opcode)
+        kk = self._get_kk(opcode)
         self.V[x] = kk
         log.debug("%s: put_vx_kk(x=%s, kk=%s)" % (hex(opcode), x, kk))
 
@@ -247,7 +263,10 @@ class Interpreter(object):
 
         Adds the value kk to the value of register Vx, then stores the result in Vx.
         """
-        log.debug("%s - add_vx_kk()" % hex(opcode))
+        x = self._get_x(opcode)
+        kk = self._get_kk(opcode)
+        self.V[x] += kk
+        log.debug("%s: add_vx_kk(x=%s, kk=%s)" % (hex(opcode), x, kk))
 
     def load_vy_vx(self, opcode):
         """
@@ -349,7 +368,7 @@ class Interpreter(object):
         """
         nnn = opcode & 0x0FFF
         self.I = nnn
-        log.debug("%s - load_i(nnn=%s)" % (hex(opcode), nnn))
+        log.debug("%s: load_i(nnn=%s)" % (hex(opcode), nnn))
 
     def jmp_v0_nnn(self, opcode):
         """
@@ -381,19 +400,19 @@ class Interpreter(object):
         VF is set to 1, otherwise it is set to 0. If the sprite is positioned so part of it
         is outside the coordinates of the display, it wraps around to the opposite side of the screen.
         """
-        x = self.V[(opcode & 0x0F00) >> 8]
-        y = self.V[(opcode & 0x00F0) >> 4]
+        x = self.V[self._get_x(opcode)]
+        y = self.V[self._get_y(opcode)]
         height = opcode & 0x000F
 
-        log.debug("%s - draw_vx_vy(x=%s, y=%s, height=%s)" % (hex(opcode), x, y, height))
+        log.debug("%s: draw_vx_vy(x=%s, y=%s, height=%s)" % (hex(opcode), x, y, height))
         for row, byte in enumerate(self.memory[self.I: self.I + height]):
             for col, bit in enumerate(to_bits(byte)):
                 if bit:
-                    graph_bit_index = ((col + x) + (row + y) * 64)
-                    if self.gfx_buffer[graph_bit_index] == 1:
+                    index = ((col + x) + (row + y) * 64)
+                    if self.gfx_buffer[index] == 1:
                         self.V[0xF] = 1
-                    self.gfx_buffer[graph_bit_index] ^= 1
-        sys.exit()
+                    self.gfx_buffer[index] ^= 1
+        self.needs_refresh = True
 
     def skip_vx(self, opcode):
         """
@@ -458,7 +477,9 @@ class Interpreter(object):
 
         The values of I and Vx are added, and the results are stored in I.
         """
-        log.debug("%s - add_i_vx()" % hex(opcode))
+        x = self._get_x(opcode)
+        self.I += self.V[x]
+        log.debug("%s: add_i_vx()" % hex(opcode))
 
     def load_f_vx(self, opcode):
         """
@@ -490,6 +511,7 @@ class Interpreter(object):
 
     def load_vx_i(self, opcode):
         """
+
         Fx65 - LD Vx, [I]
         Read registers V0 through Vx from memory starting at location I.
 
@@ -502,4 +524,8 @@ code = [0xf21e, 0xf21e]
 
 i = Interpreter()
 # i.run(program_raw=code)
-i.run(program_path='/home/facetoe/Downloads/chio/INVADERS')
+
+i.initialize(program_path='/home/facetoe/Downloads/chio/INVADERS')
+for _ in range(50):
+    i.tick()
+    sleep(0.2)
