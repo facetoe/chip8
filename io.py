@@ -1,8 +1,22 @@
 import curses
 
+import logging
+
+log = logging.getLogger()
+log.setLevel(logging.DEBUG)
+
+# ch = logging.StreamHandler(sys.stdout)
+fh = logging.FileHandler('/dev/pts/1')
+fh.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(message)s')
+fh.setFormatter(formatter)
+log.addHandler(fh)
 
 class IO(object):
     win = None
+
+    height = 32
+    width = 64
 
     def __init__(self, screen):
         self.initialize(screen)
@@ -15,15 +29,17 @@ class IO(object):
         screen.bkgd(curses.color_pair(1))
         screen.refresh()
 
-        self.win = curses.newwin(32, 64, 5, 5)
+        self.win = curses.newwin(self.height, self.width, 0, 0)
         self.win.bkgd(curses.color_pair(2))
 
     def draw(self, graphics):
         self.win.clear()
         for i, bit in enumerate(graphics):
-            x, y = (i % 32), (i / 32)
-            char = '*' if bit else ""
-            if x < 61 and y < 31:
-                self.win.addstr(y, x, char)
+            width, height = (i % self.width), (i / self.width)
+            log.debug("height=%s, width=%s" % (height, width))
+            char = '*' if bit else " "
+            if height < self.height-1 and width < self.width-1:
+                self.win.addstr(height, width, char)
+
         self.win.box()
         self.win.refresh()

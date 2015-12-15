@@ -1,6 +1,5 @@
 import logging
 import os
-import sys
 from time import sleep
 
 from util import to_bits
@@ -30,6 +29,10 @@ class VirtualMachine(object):
 
     # Memory before this address is reserved for other purposes
     PROGRAM_START = 0x200
+
+    # Height and width of screen
+    SCREEN_HEIGHT = 32
+    SCREEN_WIDTH = 64
 
     # Mapping of opcodes to functions that handle them
     function_map = None
@@ -94,7 +97,7 @@ class VirtualMachine(object):
             elif res == 0x8000:
                 func = self.function_map[res & 0xF00F]
             # The E and F space is also shared. The second half of the first byte tells us what we have
-            elif res == 0xE000 :
+            elif res == 0xE000:
                 func = self.function_map[opcode & 0xF0FF]
             elif res == 0xF000:
                 func = self.function_map[opcode & 0xF0FF]
@@ -424,12 +427,10 @@ class VirtualMachine(object):
         for row, byte in enumerate(self.memory[self.I: self.I + height]):
             for col, bit in enumerate(to_bits(byte)):
                 if bit:
-                    index = (row + y) * 64 + (col + x)
-                    if self.gfx_buffer[index] == 1:
-                        self.V[0xF] = 1
+                    index = (y + row) * self.SCREEN_WIDTH + (x + col)
+                    self.V[0xF] = 1 if self.gfx_buffer[index] == 1 else 0
                     self.gfx_buffer[index] ^= 1
         self.needs_refresh = True
-        sleep(1)
         log.debug('\n')
 
     def skip_vx(self, opcode):
@@ -545,7 +546,6 @@ class VirtualMachine(object):
         """
         log.debug("%s - load_vx_i()" % hex(opcode))
         exit()
-
 
 # code = [0xf21e, 0xf21e]
 #
