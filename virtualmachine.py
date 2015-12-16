@@ -1,8 +1,5 @@
 import logging
 import os
-from time import sleep
-
-from util import to_bits
 
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
@@ -424,14 +421,14 @@ class VirtualMachine(object):
         height = opcode & 0x000F
 
         log.debug("%s: draw_vx_vy(x=%s, y=%s, height=%s)" % (hex(opcode), x, y, height))
-        for row, byte in enumerate(self.memory[self.I: self.I + height]):
-            for col, bit in enumerate(to_bits(byte)):
-                if bit:
-                    index = (y + row) * self.SCREEN_WIDTH + (x + col)
-                    self.V[0xF] = 1 if self.gfx_buffer[index] == 1 else 0
+        for row, gfx_byte in enumerate(self.memory[self.I: self.I + height]):
+            for col in range(8):
+                if gfx_byte & (0x80 >> col) != 0:
+                    index = x + col + ((y + row) * 64)
+                    if self.gfx_buffer[index] == 1:
+                        self.V[0xF] = 1
                     self.gfx_buffer[index] ^= 1
         self.needs_refresh = True
-        log.debug('\n')
 
     def skip_vx(self, opcode):
         """

@@ -1,3 +1,5 @@
+# coding: utf-8
+
 import curses
 
 import logging
@@ -15,8 +17,8 @@ log.addHandler(fh)
 class IO(object):
     win = None
 
-    height = 32
-    width = 64
+    SCREEN_HEIGHT = 32
+    SCREEN_WIDTH = 64
 
     def __init__(self, screen):
         self.initialize(screen)
@@ -25,21 +27,21 @@ class IO(object):
         curses.start_color()
         curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
         curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
+        curses.init_pair(3, curses.COLOR_GREEN, curses.COLOR_GREEN)
 
         screen.bkgd(curses.color_pair(1))
         screen.refresh()
 
-        self.win = curses.newwin(self.height, self.width, 0, 0)
+        self.win = curses.newwin(self.SCREEN_HEIGHT, self.SCREEN_WIDTH, 0, 0)
         self.win.bkgd(curses.color_pair(2))
 
     def draw(self, graphics):
         self.win.clear()
         for i, bit in enumerate(graphics):
-            width, height = (i % self.width), (i / self.width)
-            log.debug("height=%s, width=%s" % (height, width))
-            char = '*' if bit else " "
-            if height < self.height-1 and width < self.width-1:
-                self.win.addstr(height, width, char)
+            width, height = (i % self.SCREEN_WIDTH), (i / self.SCREEN_WIDTH)
+            char = '*' if bit else ""
+            if height < self.SCREEN_HEIGHT-1 and width < self.SCREEN_WIDTH-1:
+                self.win.addstr(height, width, char, curses.color_pair(3))
 
         self.win.box()
         self.win.refresh()
