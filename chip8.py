@@ -1,10 +1,9 @@
 import curses
 from time import sleep
 
-import logging
+from lib.vm import VirtualMachine
 
-from io import IO
-from virtualmachine import VirtualMachine
+from lib.io import IO
 
 
 def main(screen):

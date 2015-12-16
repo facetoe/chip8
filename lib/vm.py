@@ -425,8 +425,7 @@ class VirtualMachine(object):
             for col in range(8):
                 if gfx_byte & (0x80 >> col) != 0:
                     index = x + col + ((y + row) * 64)
-                    if self.gfx_buffer[index] == 1:
-                        self.V[0xF] = 1
+                    self.V[0xF] = 1 if self.gfx_buffer[index] == 1 else 0
                     self.gfx_buffer[index] ^= 1
         self.needs_refresh = True
 
